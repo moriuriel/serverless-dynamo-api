@@ -1,0 +1,54 @@
+service: serverless-games-api
+frameworkVersion: "3"
+
+provider:
+  name: aws
+  runtime: nodejs14.x
+  environment:
+    DYNAMODB_TABLE: games
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - dynamodb:GetItem
+        - dynamodb:UpdateItem
+        - dynamodb:PutItem
+        - dynamodb:ListStreams
+        - dynamodb:DescribeStreams
+      Resource: "arn:aws:dynamodb:${aws:region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
+plugins:
+  - serverless-plugin-typescript
+  - serverless-offline
+functions:
+  listAllGames:
+    handler: src/handlers/index.listAllGames
+    events:
+      - httpApi:
+          path: /
+          method: get
+  createGame:
+    handler: src/handlers/index.createGame
+    events:
+      - httpApi:
+          path: /
+          method: post
+  listGameById:
+    handler: src/handlers/index.listGameById
+    events:
+      - httpApi:
+          path: /{id}
+          method: get
+resources:
+  Resources:
+    GamesTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.DYNAMODB_TABLE}
+        AttributeDefinitions:
+          - AttributeName: gameID
+            AttributeType: S
+        KeySchema:
+          - AttributeName: gameID
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
