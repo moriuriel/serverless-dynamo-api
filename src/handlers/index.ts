@@ -4,15 +4,17 @@ import { v4 } from "uuid";
 import { handleError, HttpError } from "../errors";
 import { CreateGameRequest, IGame } from "../models/Game";
 import { GameRepository } from "../repositories/Game.repository";
-import { CreateGameService } from "../services/CreateGameService";
+import { CreateGameService, FindAllGamesService, FindGameByIdService } from "../services";
 
 const docClient = new AWS.DynamoDB.DocumentClient();
 const tableName = "games";
 
 export const listAllGames = async (): Promise<APIGatewayProxyResult> => {
-  const response = await docClient.scan({ TableName: tableName }).promise();
+  const gameRepository = new GameRepository();
 
-  const games = response.Items as IGame[];
+  const findAllGameService = new FindAllGamesService(gameRepository);
+
+  const games = await findAllGameService.execute();
 
   return {
     statusCode: 200,
@@ -21,47 +23,39 @@ export const listAllGames = async (): Promise<APIGatewayProxyResult> => {
 };
 
 export const createGame = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-  const body = JSON.parse(event.body as string);
+  try {
+    const body = JSON.parse(event.body as string);
 
-  const data: CreateGameRequest = { ...body, gameID: v4() };
+    const data: CreateGameRequest = { ...body, gameID: v4() };
 
-  const gameRepository = new GameRepository();
+    const gameRepository = new GameRepository();
 
-  const createGameService = new CreateGameService(gameRepository);
+    const createGameService = new CreateGameService(gameRepository);
 
-  const game = await createGameService.execute(data);
+    const game = await createGameService.execute(data);
 
-  return {
-    statusCode: 201,
-    body: JSON.stringify(game),
-  };
-};
-
-const fetchGameById = async (id: string) => {
-  const output = await docClient
-    .get({
-      TableName: tableName,
-      Key: {
-        gameID: id,
-      },
-    })
-    .promise();
-
-  if (!output.Item) {
-    throw new HttpError(404, { error: "not found" });
+    return {
+      statusCode: 201,
+      body: JSON.stringify(game),
+    };
+  } catch (e) {
+    return handleError(e);
   }
-
-  return output.Item;
 };
 
 export const listGameById = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   try {
-    const product = await fetchGameById(event.pathParameters?.id as string);
+    const id = event.pathParameters?.id as string;
 
+    const gameRepository = new GameRepository();
+
+    const findGameByIdService = new FindGameByIdService(gameRepository);
+
+    const game = await findGameByIdService.execute(id);
     return {
       statusCode: 200,
 
-      body: JSON.stringify(product),
+      body: JSON.stringify(game),
     };
   } catch (e) {
     return handleError(e);
