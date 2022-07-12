@@ -3,6 +3,8 @@ import AWS from "aws-sdk";
 import { v4 } from "uuid";
 import { handleError, HttpError } from "../errors";
 import { CreateGameRequest, IGame } from "../models/Game";
+import { GameRepository } from "../repositories/Game.repository";
+import { CreateGameService } from "../services/CreateGameService";
 
 const docClient = new AWS.DynamoDB.DocumentClient();
 const tableName = "games";
@@ -21,13 +23,16 @@ export const listAllGames = async (): Promise<APIGatewayProxyResult> => {
 export const createGame = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
   const body = JSON.parse(event.body as string);
 
-  const game: CreateGameRequest = { ...body, gameID: v4() };
+  const data: CreateGameRequest = { ...body, gameID: v4() };
 
-  await docClient.put({ TableName: tableName, Item: game }).promise();
+  const gameRepository = new GameRepository();
+
+  const createGameService = new CreateGameService(gameRepository);
+
+  const game = await createGameService.execute(data);
 
   return {
     statusCode: 201,
-
     body: JSON.stringify(game),
   };
 };
